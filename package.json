@@ -1,0 +1,37 @@
+{
+    "name": "nx-remotecache-gcs",
+    "version": "1.0.0",
+    "description": "Remote caching for @nrwl/nx using Google Cloud Storage",
+    "main": "index.js",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "prepare": "tsc"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/wvanderdeijl/nx-remotecache-gcs.git"
+    },
+    "author": "",
+    "license": "MIT",
+    "bugs": {
+        "url": "https://github.com/wvanderdeijl/nx-remotecache-gcs/issues"
+    },
+    "homepage": "https://github.com/wvanderdeijl/nx-remotecache-gcs#readme",
+    "devDependencies": {
+        "@nrwl/workspace": "^9.2.2",
+        "@types/yargs": "^15.0.4",
+        "typescript": "^3.8.3"
+    },
+    "dependencies": {
+        "@google-cloud/storage": "^4.7.0",
+        "@types/mkdirp": "^1.0.0",
+        "mkdirp": "^1.0.4"
+    },
+    "peerDependencies": {
+        "@nrwl/workspace": "^9.2.2"
+    },
+    "files": [
+        "index.js",
+        "lifecycle.json"
+    ]
+}
