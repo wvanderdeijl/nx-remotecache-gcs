@@ -28,7 +28,7 @@ export default function runner(
             return true;
         } catch (e) {
             console.log(e);
-            console.log(`WARNING: failed to download cache from ${bucket.name}: ${e.message}`);
+            console.log(`WARNING: failed to download cache from ${bucket.name}: ${e instanceof Error ? e.message : 'unknown error'}`);
             return false;
         }
 
@@ -48,7 +48,7 @@ export default function runner(
             console.log(`stored ${tasks.length + 1} files in cache gs://${bucket.name}/${hash}`);
             return true;
         } catch (e) {
-            console.log(`WARNING: failed to upload cache to ${bucket.name}: ${e.message}`);
+            console.log(`WARNING: failed to upload cache to ${bucket.name}: ${e instanceof Error ? e.message : 'unknown error'}`);
             return false;
         }
 
