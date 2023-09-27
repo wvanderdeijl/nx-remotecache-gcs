@@ -27,9 +27,19 @@ export default function runner(
             await mkdirp(cacheDirectory);
 
             // first try to download entire tar file
-            await pipeline(tarFile.createReadStream(), tar.extract(join(cacheDirectory, hash)));
+            const ignoreFile = join(cacheDirectory, hash, 'source');
+            await pipeline(
+                tarFile.createReadStream(),
+                tar.extract(join(cacheDirectory, hash), {
+                    // do not extract the `source` file that nx uses to detect that the cache originates from another machine
+                    // see https://github.com/nrwl/nx/pull/18057
+                    ignore: name => name === ignoreFile,
+                }),
+            );
             // commit file after we're sure all content is downloaded
-            await commitFile.download({destination:join(cacheDirectory, `${hash}.commit`)});
+            await commitFile.download({
+                destination: join(cacheDirectory, `${hash}.commit`),
+            });
             console.log(`retrieved cache from gs://${bucket.name}/${hash}.commit and gs://${bucket.name}/${hash}.tar`);
             return true;
         } catch (e) {
@@ -43,8 +53,8 @@ export default function runner(
         try {
             await Promise.all([
                 pipeline(tar.pack(join(cacheDirectory, hash)), bucket.file(`${hash}.tar`).createWriteStream()),
-                bucket.upload(join(cacheDirectory, `${hash}.commit`))
-            ])
+                bucket.upload(join(cacheDirectory, `${hash}.commit`)),
+            ]);
             console.log(`stored cache at gs://${bucket.name}/${hash}.commit and gs://${bucket.name}/${hash}.tar`);
             return true;
         } catch (e) {
@@ -54,7 +64,7 @@ export default function runner(
     }
 
     function getErrorMessage(e: unknown) {
-        return typeof e==='object' && !!e && 'message' in e && typeof e.message==='string' ? e.message: ''
+        return typeof e === 'object' && !!e && 'message' in e && typeof e.message === 'string' ? e.message : '';
     }
 
     async function fileExists(f: File) {

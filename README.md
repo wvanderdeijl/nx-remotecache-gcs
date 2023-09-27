@@ -8,7 +8,7 @@ A task runner for [Nx](https://nx.dev/) that uses a Google Cloud Storage bucket 
 npm install --save-dev nx-remotecache-gcs
 ```
 
-create a Google Cloud Storage bucket. Since this is only a cache, there is no need for a dual- or multi-region bucket, so choose a  single [location](https://cloud.google.com/storage/docs/locations) near you.
+create a Google Cloud Storage bucket. Since this is only a cache, there is no need for a dual- or multi-region bucket, so choose a single [location](https://cloud.google.com/storage/docs/locations) near you.
 
 ```
 gsutil mb -p [PROJECT_ID] -l [BUCKET_LOCATION] -b on gs://[BUCKET_NAME]/
