@@ -1,6 +1,6 @@
 # nx-remotecache-gcs
 
-A task runner for [@nrwl/nx](https://nx.dev/react) that uses a Google Cloud Storage bucket as a remote cache, so all team members and CI servers can share a single cache. The concept and benefits of [computation caching](https://nx.dev/angular/guides/computation-caching) are explained in the NX documentation.
+A task runner for [Nx](https://nx.dev/) that uses a Google Cloud Storage bucket as a remote cache, so all team members and CI servers can share a single cache. The concept and benefits of [computation caching](https://nx.dev/core-features/cache-task-results) are explained in the NX documentation.
 
 ## setup
 
