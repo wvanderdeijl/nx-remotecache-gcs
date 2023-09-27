@@ -1,6 +1,6 @@
 {
     "name": "nx-remotecache-gcs",
-    "version": "2.0.0",
+    "version": "2.1.0",
     "description": "Remote caching for nx using Google Cloud Storage",
     "main": "index.js",
     "scripts": {
