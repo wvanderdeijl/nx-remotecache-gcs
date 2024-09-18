@@ -59,3 +59,7 @@ This can be benficial for some CI cases you want to run without using the remote
 ```
 export NX_SKIP_REMOTE_CACHE=true
 ```
+
+```
+NX_SKIP_REMOTE_CACHE=true nx run project:target
+```
