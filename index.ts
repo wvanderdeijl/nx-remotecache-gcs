@@ -17,6 +17,7 @@ export default function runner(
     return defaultTaskRunner(tasks, { ...options, remoteCache: { retrieve, store } }, context);
 
     async function retrieve(hash: string, cacheDirectory: string): Promise<boolean> {
+        if (process.env.NX_SKIP_REMOTE_CACHE) return false;
         try {
             const commitFile = bucket.file(`${hash}.commit`);
             const tarFile = bucket.file(`${hash}.tar`);
@@ -50,6 +51,7 @@ export default function runner(
     }
 
     async function store(hash: string, cacheDirectory: string): Promise<boolean> {
+        if (process.env.NX_SKIP_REMOTE_CACHE) return false;
         try {
             await Promise.all([
                 pipeline(tar.pack(join(cacheDirectory, hash)), bucket.file(`${hash}.tar`).createWriteStream()),
