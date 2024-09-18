@@ -54,10 +54,13 @@ nx run-many --target=build --all
 ```
 
 ## Options
-Using NX_SKIP_REMOTE_CACHE for temporary disabling remote cache. while keeping the local cache in tact
-This can be benficial for some CI cases you want to run without using the remote cache.
+
+Use NX_SKIP_REMOTE_CACHE environment variable for temporary disabling remote cache, while keeping the local cache in tact.
+This can be beneficial for some CI cases you want to run without using the remote cache.
+
 ```
 export NX_SKIP_REMOTE_CACHE=true
+nx run project:target
 ```
 
 ```
