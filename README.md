@@ -52,3 +52,17 @@ run a build and see if files end up in your cache storage bucket:
 ```
 nx run-many --target=build --all
 ```
+
+## Options
+
+Use NX_SKIP_REMOTE_CACHE environment variable for temporary disabling remote cache, while keeping the local cache in tact.
+This can be beneficial for some CI cases you want to run without using the remote cache.
+
+```
+export NX_SKIP_REMOTE_CACHE=true
+nx run project:target
+```
+
+```
+NX_SKIP_REMOTE_CACHE=true nx run project:target
+```
