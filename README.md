@@ -2,6 +2,10 @@
 
 A task runner for [Nx](https://nx.dev/) that uses a Google Cloud Storage bucket as a remote cache, so all team members and CI servers can share a single cache. The concept and benefits of [computation caching](https://nx.dev/core-features/cache-task-results) are explained in the NX documentation.
 
+> [!WARNING]  
+> - When using NX version 20 you have to [set useLegacyCache to true in nx.json](https://nx.dev/deprecated/legacy-cache)
+> - This plugin will no longer work in NX version 21, but you can [migrate to the `@nx/gcs-cache` plugin](https://nx.dev/reference/core-api/gcs-cache/overview)
+
 ## setup
 
 ```
