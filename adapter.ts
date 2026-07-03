@@ -128,7 +128,12 @@ async function errorHandler(err: unknown, req: express.Request, res: express.Res
     }
 }
 
-function onListen() {
+function onListen(err?: Error) {
+    if (err) {
+        console.error(`[${new Date().toISOString()}] Failed to start server: ${err.message}`);
+        process.exit(1);
+    }
+
     console.log(`Nx GCS Adapter listening on http://${argv.host}:${argv.port}`);
     console.log(`Using bucket: ${argv.bucket}`);
     if (argv.prefix) console.log(`Using prefix: ${argv.prefix}`);
