@@ -1,8 +1,11 @@
 {
     "name": "nx-remotecache-gcs",
-    "version": "2.2.0",
+    "version": "3.0.0",
     "description": "Remote caching for nx using Google Cloud Storage",
-    "main": "index.js",
+    "main": "legacy.js",
+    "bin": {
+        "nx-remotecache-gcs": "adapter.js"
+    },
     "scripts": {
         "test": "echo \"Error: no test specified\" && exit 1",
         "prepare": "prettier -w . && tsc"
@@ -18,23 +21,27 @@
     },
     "homepage": "https://github.com/wvanderdeijl/nx-remotecache-gcs#readme",
     "devDependencies": {
-        "@nx/workspace": "^16.9.1",
-        "@types/node": "^20.7.0",
-        "@types/yargs": "^17.0.25",
-        "prettier": "^3.0.3",
-        "typescript": "^5.2.2"
+        "@nx/workspace": "^20.8.4",
+        "@types/express": "^5.0.6",
+        "@types/node": "^20.17.43",
+        "@types/yargs": "^17.0.35",
+        "prettier": "^3.9.4",
+        "typescript": "^6.0.3"
     },
     "dependencies": {
-        "@google-cloud/storage": "^7.1.0",
-        "@types/tar-fs": "^2.0.2",
+        "@google-cloud/storage": "^7.21.0",
+        "@types/tar-fs": "^2.0.4",
+        "express": "^5.0.1",
         "mkdirp": "^3.0.1",
-        "tar-fs": "^3.0.4"
+        "tar-fs": "^3.1.3",
+        "yargs": "^18.0.0"
     },
     "peerDependencies": {
         "@nx/workspace": ">=16.0.0"
     },
     "files": [
-        "index.js",
+        "legacy.js",
+        "adapter.js",
         "lifecycle.json"
     ]
 }

@@ -7,17 +7,20 @@ import { pipeline } from 'stream/promises';
 
 export default function runner(
     tasks: Parameters<typeof defaultTaskRunner>[0],
-    options: Parameters<typeof defaultTaskRunner>[1] & { bucket?: string },
+    options: Parameters<typeof defaultTaskRunner>[1] & { bucket?: string; readOnly?: boolean },
     context: Parameters<typeof defaultTaskRunner>[2],
 ) {
     if (!options.bucket) {
         throw new Error('missing bucket property in runner options. Please update nx.json');
     }
+    const isDisabled = process.env.NX_DISABLE_REMOTE_CACHE === 'true' || process.env.NX_SKIP_REMOTE_CACHE === 'true';
+    const isReadOnly = options.readOnly || process.env.NX_READ_ONLY_REMOTE_CACHE === 'true';
+
     const bucket = new Storage().bucket(options.bucket);
     return defaultTaskRunner(tasks, { ...options, remoteCache: { retrieve, store } }, context);
 
     async function retrieve(hash: string, cacheDirectory: string): Promise<boolean> {
-        if (process.env.NX_SKIP_REMOTE_CACHE === 'true') return false;
+        if (isDisabled) return false;
         try {
             const commitFile = bucket.file(`${hash}.commit`);
             const tarFile = bucket.file(`${hash}.tar`);
@@ -51,7 +54,12 @@ export default function runner(
     }
 
     async function store(hash: string, cacheDirectory: string): Promise<boolean> {
-        if (process.env.NX_SKIP_REMOTE_CACHE === 'true') return false;
+        if (isDisabled) return false;
+
+        if (isReadOnly) {
+            console.log('Skipping remote cache save (read-only mode)');
+            return true;
+        }
         try {
             await Promise.all([
                 pipeline(tar.pack(join(cacheDirectory, hash)), bucket.file(`${hash}.tar`).createWriteStream()),
@@ -66,7 +74,7 @@ export default function runner(
     }
 
     function getErrorMessage(e: unknown) {
-        return typeof e === 'object' && !!e && 'message' in e && typeof e.message === 'string' ? e.message : '';
+        return typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e);
     }
 
     async function fileExists(f: File) {
