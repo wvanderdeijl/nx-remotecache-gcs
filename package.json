@@ -26,7 +26,7 @@
         "@types/node": "^20.17.43",
         "@types/yargs": "^17.0.35",
         "prettier": "^3.9.6",
-        "typescript": "^6.0.3"
+        "typescript": "^7.0.2"
     },
     "dependencies": {
         "@google-cloud/storage": "^7.21.0",
