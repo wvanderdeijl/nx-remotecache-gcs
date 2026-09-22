@@ -84,8 +84,8 @@ async function putHandler(req: express.Request<{ hash: string }>, res: express.R
     const file = storage.bucket(argv.bucket).file(argv.prefix ? `${argv.prefix}${hash}` : hash);
 
     if (argv.readOnly) {
-        console.log(`[${new Date().toISOString()}] PUT ${req.path} - 204 No Content (Read-Only Mode)`);
-        res.sendStatus(204);
+        console.log(`[${new Date().toISOString()}] PUT ${req.path} - 200 OK (Read-Only Mode)`);
+        res.sendStatus(200);
         return;
     }
 
@@ -99,8 +99,8 @@ async function putHandler(req: express.Request<{ hash: string }>, res: express.R
                 preconditionOpts: { ifGenerationMatch: 0 },
             }),
         );
-        console.log(`[${new Date().toISOString()}] PUT ${req.path} - 204 No Content`);
-        res.sendStatus(204);
+        console.log(`[${new Date().toISOString()}] PUT ${req.path} - 200 OK`);
+        res.sendStatus(200);
     } catch (e) {
         if (hasNumericCode(e)) {
             /**
