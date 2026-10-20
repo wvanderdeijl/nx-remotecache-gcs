@@ -45,13 +45,13 @@ express()
 function authHandler(req: express.Request, res: express.Response, next: express.NextFunction) {
     if (argv.token) {
         if (!req.headers.authorization) {
-            console.warn(`[${new Date().toISOString()}] 401 Unauthorized - Missing token from ${req.ip}`);
             res.sendStatus(401);
+            console.warn(`[${new Date().toISOString()}] 401 Unauthorized - Missing token from ${req.ip}`);
             return;
         }
         if (req.headers.authorization !== `Bearer ${argv.token}`) {
-            console.warn(`[${new Date().toISOString()}] 403 Forbidden - Invalid token from ${req.ip}`);
             res.sendStatus(403);
+            console.warn(`[${new Date().toISOString()}] 403 Forbidden - Invalid token from ${req.ip}`);
             return;
         }
     }
@@ -64,19 +64,18 @@ async function getOrHeadHandler(req: express.Request<{ hash: string }>, res: exp
 
     const [exists] = await file.exists();
     if (!exists) {
-        console.log(`[${new Date().toISOString()}] ${req.method} ${req.path} - 404 Not Found`);
         res.sendStatus(404);
+        console.log(`[${new Date().toISOString()}] ${req.method} ${req.path} - 404 Not Found`);
         return;
     }
-
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.path} - 200 OK`);
 
     if (req.method === 'HEAD') {
         res.sendStatus(200);
-        return;
+    } else {
+        await pipeline(file.createReadStream(), res);
     }
 
-    await pipeline(file.createReadStream(), res);
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.path} - 200 OK`);
 }
 
 async function putHandler(req: express.Request<{ hash: string }>, res: express.Response) {
@@ -84,8 +83,8 @@ async function putHandler(req: express.Request<{ hash: string }>, res: express.R
     const file = storage.bucket(argv.bucket).file(argv.prefix ? `${argv.prefix}${hash}` : hash);
 
     if (argv.readOnly) {
-        console.log(`[${new Date().toISOString()}] PUT ${req.path} - 200 OK (Read-Only Mode)`);
         res.sendStatus(200);
+        console.log(`[${new Date().toISOString()}] PUT ${req.path} - 200 OK (Read-Only Mode)`);
         return;
     }
 
@@ -99,8 +98,8 @@ async function putHandler(req: express.Request<{ hash: string }>, res: express.R
                 preconditionOpts: { ifGenerationMatch: 0 },
             }),
         );
-        console.log(`[${new Date().toISOString()}] PUT ${req.path} - 200 OK`);
         res.sendStatus(200);
+        console.log(`[${new Date().toISOString()}] PUT ${req.path} - 200 OK`);
     } catch (e) {
         if (hasNumericCode(e)) {
             /**
@@ -109,8 +108,8 @@ async function putHandler(req: express.Request<{ hash: string }>, res: express.R
              * This must be mapped to 409 per the Nx Self-Hosted Caching OpenAPI spec.
              */
             if (e.code === 412) {
-                console.log(`[${new Date().toISOString()}] PUT ${req.path} - 409 Conflict (Already exists)`);
                 res.sendStatus(409);
+                console.log(`[${new Date().toISOString()}] PUT ${req.path} - 409 Conflict (Already exists)`);
                 return;
             }
         }
@@ -121,10 +120,11 @@ async function putHandler(req: express.Request<{ hash: string }>, res: express.R
 async function errorHandler(err: unknown, req: express.Request, res: express.Response, _next: express.NextFunction) {
     const message = isObject(err) && 'message' in err && typeof err.message === 'string' ? err.message : String(err);
 
-    console.error(`[${new Date().toISOString()}] ${req.method} ${req.path} - Error (500): ${message}`);
-
-    if (!res.headersSent) {
+    if (!res.headersSent && !res.destroyed) {
         res.sendStatus(500);
+        console.error(`[${new Date().toISOString()}] ${req.method} ${req.path} - Error (500): ${message}`);
+    } else {
+        console.warn(`[${new Date().toISOString()}] ${req.method} ${req.path} - Request aborted: ${message}`);
     }
 }
 
