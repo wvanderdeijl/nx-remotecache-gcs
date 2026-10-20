@@ -31,7 +31,19 @@ const argv = yargs(hideBin(process.argv))
 // See official Nx Self-Hosted Caching Specification:
 // https://nx.dev/docs/guides/tasks--caching/self-hosted-caching
 const CACHE_PATH = '/v1/cache/:hash';
-const storage = new Storage();
+const getStorage = (() => {
+    let storage = new Storage();
+    return async () => {
+        try {
+            await storage.authClient.getAccessToken();
+        } catch {
+            // Re-initialize Storage in case Application Default Credentials on disk were refreshed
+            // (e.g., after `gcloud auth application-default login` when a RAPT session expired).
+            storage = new Storage();
+        }
+        return storage;
+    };
+})();
 
 // The Ultimate Chain: Initialize -> Middleware -> Routes -> Error Handler -> Listen
 express()
@@ -60,6 +72,7 @@ function authHandler(req: express.Request, res: express.Response, next: express.
 
 async function getOrHeadHandler(req: express.Request<{ hash: string }>, res: express.Response) {
     const { hash } = req.params;
+    const storage = await getStorage();
     const file = storage.bucket(argv.bucket).file(argv.prefix ? `${argv.prefix}${hash}` : hash);
 
     const [exists] = await file.exists();
@@ -79,14 +92,15 @@ async function getOrHeadHandler(req: express.Request<{ hash: string }>, res: exp
 }
 
 async function putHandler(req: express.Request<{ hash: string }>, res: express.Response) {
-    const { hash } = req.params;
-    const file = storage.bucket(argv.bucket).file(argv.prefix ? `${argv.prefix}${hash}` : hash);
-
     if (argv.readOnly) {
         res.sendStatus(200);
         console.log(`[${new Date().toISOString()}] PUT ${req.path} - 200 OK (Read-Only Mode)`);
         return;
     }
+
+    const { hash } = req.params;
+    const storage = await getStorage();
+    const file = storage.bucket(argv.bucket).file(argv.prefix ? `${argv.prefix}${hash}` : hash);
 
     console.log(`[${new Date().toISOString()}] PUT ${req.path} - Uploading as application/gzip...`);
 

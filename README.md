@@ -29,7 +29,7 @@ npm install --save-dev nx-remotecache-gcs
 
 ### 2. Start the Adapter
 
-The adapter should run locally (or as a sidecar in CI). It uses **Application Default Credentials (ADC)** for authentication towards Google Cloud Storage.
+The adapter should run locally (or as a sidecar in CI). It uses **Application Default Credentials (ADC)** for authentication towards Google Cloud Storage and automatically reloads credentials from disk when you re-authenticate via `gcloud auth application-default login` (e.g., after a RAPT session expires), so a long-running local adapter process never needs to be restarted.
 
 ```bash
 npx nx-remotecache-gcs --bucket your-gcs-bucket-name
