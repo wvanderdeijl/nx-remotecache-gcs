@@ -38,20 +38,42 @@ const argv = yargs(hideBin(process.argv))
 // https://nx.dev/docs/guides/tasks--caching/self-hosted-caching
 const CACHE_PATH = '/v1/cache/:hash';
 
-// @google-cloud/storage streams do not enforce a socket or stream timeout by default. If a stateful
-// firewall or NAT gateway silently drops a connection without sending a FIN/RST, the stream would
-// otherwise hang until the OS TCP retransmission timeout (~15-30 minutes).
-const STREAM_TIMEOUT_MS = 60_000;
+/**
+ * Per-attempt HTTP response-header timeout passed to `@google-cloud/storage`.
+ *
+ * In `node-fetch` (used via `teeny-request`), this timer starts when a socket is assigned and
+ * is cleared as soon as the HTTP response headers arrive (plus a body read timeout for small
+ * non-streaming JSON calls like `file.exists()`). It does not cap the download duration once
+ * response streaming has started.
+ *
+ * By default, `@google-cloud/storage` leaves this undefined. If a stateful firewall or NAT
+ * gateway silently blackholes a connection during the handshake/request phase, an attempt would
+ * wait for the OS TCP retransmission timeout (~11-15 minutes), exceeding `retry-request`'s
+ * `totalTimeout` (600s) and triggering an upstream bug where `retry-request` silently returns
+ * without settling the request (https://github.com/googleapis/google-cloud-node/issues/9706).
+ *
+ * A 10s timeout aborts a blackholed socket quickly so `retry-request` can automatically retry
+ * on a fresh connection (up to 3 retries with ~2s/4s/8s backoff), while fitting all 4 attempts
+ * inside `STREAM_OPERATION_TIMEOUT_MS`.
+ */
+const REQUEST_ATTEMPT_TIMEOUT_MS = 10_000;
+
+/**
+ * Overall deadline for a complete `GET` or `PUT` stream operation in `adapter.ts`, spanning
+ * all underlying retry attempts (for `GET`) or the entire resumable upload pipeline (for `PUT`,
+ * which uses `gaxios` and does not inherit `Storage.timeout`).
+ */
+const STREAM_OPERATION_TIMEOUT_MS = 60_000;
 
 const getStorage = (() => {
-    let storage = new Storage();
+    let storage = new Storage({ timeout: REQUEST_ATTEMPT_TIMEOUT_MS });
     return async () => {
         try {
             await storage.authClient.getAccessToken();
         } catch {
             // Re-initialize Storage in case Application Default Credentials on disk were refreshed
             // (e.g., after `gcloud auth application-default login` when a RAPT session expired).
-            storage = new Storage();
+            storage = new Storage({ timeout: REQUEST_ATTEMPT_TIMEOUT_MS });
         }
         return storage;
     };
@@ -127,7 +149,7 @@ async function getHandler(req: express.Request<{ hash: string }>, res: express.R
     stream.pipe(res);
 
     try {
-        await finished(stream, { signal: AbortSignal.timeout(STREAM_TIMEOUT_MS) });
+        await finished(stream, { signal: AbortSignal.timeout(STREAM_OPERATION_TIMEOUT_MS) });
         console.log(`[${new Date().toISOString()}] GET ${req.path} - 200 OK`);
     } catch (e) {
         // Ensure the upstream GCS stream is cleaned up if an error occurs before the stream closed.
@@ -173,7 +195,7 @@ async function putHandler(req: express.Request<{ hash: string }>, res: express.R
                 metadata: { contentType: 'application/gzip' },
                 preconditionOpts: { ifGenerationMatch: 0 },
             }),
-            { signal: AbortSignal.timeout(STREAM_TIMEOUT_MS) },
+            { signal: AbortSignal.timeout(STREAM_OPERATION_TIMEOUT_MS) },
         );
         res.sendStatus(200);
         console.log(`[${new Date().toISOString()}] PUT ${req.path} - 200 OK`);
