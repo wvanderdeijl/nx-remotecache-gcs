@@ -24,6 +24,12 @@ const argv = yargs(hideBin(process.argv))
             alias: 'r',
             describe: 'Run in read-only mode',
         },
+        'concurrency': {
+            type: 'number',
+            default: 16,
+            alias: 'c',
+            describe: 'Maximum number of concurrent GCS operations',
+        },
     })
     .help()
     .parseSync();
@@ -31,6 +37,12 @@ const argv = yargs(hideBin(process.argv))
 // See official Nx Self-Hosted Caching Specification:
 // https://nx.dev/docs/guides/tasks--caching/self-hosted-caching
 const CACHE_PATH = '/v1/cache/:hash';
+
+// @google-cloud/storage streams do not enforce a socket or stream timeout by default. If a stateful
+// firewall or NAT gateway silently drops a connection without sending a FIN/RST, the stream would
+// otherwise hang until the OS TCP retransmission timeout (~15-30 minutes).
+const STREAM_TIMEOUT_MS = 60_000;
+
 const getStorage = (() => {
     let storage = new Storage();
     return async () => {
@@ -50,6 +62,7 @@ const getStorage = (() => {
 // requests to the first matching .get() handler if no .head() handler precedes it.
 express()
     .use(authHandler)
+    .use(concurrencyHandler())
     .head(CACHE_PATH, headHandler)
     .get(CACHE_PATH, getHandler)
     .put(CACHE_PATH, putHandler)
@@ -72,6 +85,37 @@ function authHandler(req: express.Request, res: express.Response, next: express.
     next();
 }
 
+function concurrencyHandler() {
+    let activeRequests = 0;
+    const waitingQueue: (() => void)[] = [];
+
+    return async (_req: express.Request, res: express.Response, next: express.NextFunction) => {
+        // Wait in FIFO order until a concurrency slot is available.
+        while (activeRequests >= argv.concurrency) {
+            await new Promise<void>(resolve => waitingQueue.push(resolve));
+        }
+
+        // If the client already disconnected while waiting in the queue, pass the wakeup to the next waiter.
+        if (res.closed || res.destroyed) {
+            waitingQueue.shift()?.();
+            return;
+        }
+
+        activeRequests++;
+        try {
+            // Register the 'close' listener before calling next() so synchronous completions are never missed,
+            // then wait until the HTTP response finishes or the connection is aborted.
+            const closed = new Promise<void>(resolve => res.once('close', resolve));
+            next();
+            await closed;
+        } finally {
+            // Release the slot and wake the next waiting request in the queue.
+            activeRequests--;
+            waitingQueue.shift()?.();
+        }
+    };
+}
+
 async function getHandler(req: express.Request<{ hash: string }>, res: express.Response) {
     const file = await getFile(req.params.hash);
 
@@ -83,7 +127,7 @@ async function getHandler(req: express.Request<{ hash: string }>, res: express.R
     stream.pipe(res);
 
     try {
-        await finished(stream);
+        await finished(stream, { signal: AbortSignal.timeout(STREAM_TIMEOUT_MS) });
         console.log(`[${new Date().toISOString()}] GET ${req.path} - 200 OK`);
     } catch (e) {
         // Ensure the upstream GCS stream is cleaned up if an error occurs before the stream closed.
@@ -129,6 +173,7 @@ async function putHandler(req: express.Request<{ hash: string }>, res: express.R
                 metadata: { contentType: 'application/gzip' },
                 preconditionOpts: { ifGenerationMatch: 0 },
             }),
+            { signal: AbortSignal.timeout(STREAM_TIMEOUT_MS) },
         );
         res.sendStatus(200);
         console.log(`[${new Date().toISOString()}] PUT ${req.path} - 200 OK`);
@@ -174,6 +219,7 @@ function onListen(err?: Error) {
     console.log(`Using bucket: ${argv.bucket}`);
     if (argv.prefix) console.log(`Using prefix: ${argv.prefix}`);
     if (argv.readOnly) console.log('Mode: READ-ONLY');
+    console.log(`Max concurrency: ${argv.concurrency}`);
     console.log(`Authentication: ${argv.token ? 'Enabled' : 'Disabled (running on local interface recommended)'}`);
 }
 
