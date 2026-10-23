@@ -5,6 +5,14 @@ import { mkdirp } from 'mkdirp';
 import tar from 'tar-fs';
 import { pipeline } from 'stream/promises';
 
+/**
+ * Per-attempt HTTP response-header timeout passed to `@google-cloud/storage`.
+ * Aborts blackholed sockets after 10s if no HTTP response headers are received, allowing
+ * `retry-request` to automatically retry on a fresh connection before hitting its 600s
+ * `totalTimeout` limit.
+ */
+const REQUEST_ATTEMPT_TIMEOUT_MS = 10_000;
+
 export default function runner(
     tasks: Parameters<typeof defaultTaskRunner>[0],
     options: Parameters<typeof defaultTaskRunner>[1] & { bucket?: string; readOnly?: boolean },
@@ -16,7 +24,7 @@ export default function runner(
     const isDisabled = process.env.NX_DISABLE_REMOTE_CACHE === 'true' || process.env.NX_SKIP_REMOTE_CACHE === 'true';
     const isReadOnly = options.readOnly || process.env.NX_READ_ONLY_REMOTE_CACHE === 'true';
 
-    const bucket = new Storage().bucket(options.bucket);
+    const bucket = new Storage({ timeout: REQUEST_ATTEMPT_TIMEOUT_MS }).bucket(options.bucket);
     return defaultTaskRunner(tasks, { ...options, remoteCache: { retrieve, store } }, context);
 
     async function retrieve(hash: string, cacheDirectory: string): Promise<boolean> {
