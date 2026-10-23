@@ -41,6 +41,7 @@ npx nx-remotecache-gcs --bucket your-gcs-bucket-name
 - `--token`: (Optional) A secret token for the client (Nx) to talk to the adapter.
 - `--read-only`: (Optional) Prevent any uploads to the bucket (and silently ignore attempts to write to the cache).
 - `--prefix`: (Optional) Prefix for GCS objects (e.g., for branch isolation).
+- `--concurrency`: (Optional) Maximum number of concurrent GCS operations (default: `16`). The default is kept conservative to protect constrained environments such as cloud CI runners (e.g., 2–4 vCPU VMs behind shared NAT gateways). On powerful local developer machines with ample CPU and network resources, raising this to `32` or `64` can roughly halve the wall-clock time of large parallel cache bursts (e.g., fetching 250 cache entries in ~250–380ms instead of ~750ms). Avoid setting this too high: opening hundreds of simultaneous TLS streams causes Node.js event-loop contention and can exhaust ephemeral SNAT ports on cloud/NAT networks, leading to silently dropped ("blackholed") connections and stalled builds.
 
 ### 3. Configure Nx
 
