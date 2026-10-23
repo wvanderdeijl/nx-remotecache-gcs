@@ -46,10 +46,12 @@ const getStorage = (() => {
 })();
 
 // The Ultimate Chain: Initialize -> Middleware -> Routes -> Error Handler -> Listen
+// Note: .head() must be registered before .get() because Express routes incoming HEAD
+// requests to the first matching .get() handler if no .head() handler precedes it.
 express()
     .use(authHandler)
-    .get(CACHE_PATH, getHandler)
     .head(CACHE_PATH, headHandler)
+    .get(CACHE_PATH, getHandler)
     .put(CACHE_PATH, putHandler)
     .use(errorHandler)
     .listen(argv.port, argv.host, onListen);
