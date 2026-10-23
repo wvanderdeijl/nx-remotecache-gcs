@@ -4,7 +4,7 @@ import express from 'express';
 import { Storage } from '@google-cloud/storage';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
-import { pipeline } from 'node:stream/promises';
+import { finished, pipeline } from 'node:stream/promises';
 
 const argv = yargs(hideBin(process.argv))
     .options({
@@ -46,10 +46,12 @@ const getStorage = (() => {
 })();
 
 // The Ultimate Chain: Initialize -> Middleware -> Routes -> Error Handler -> Listen
+// Note: .head() must be registered before .get() because Express routes incoming HEAD
+// requests to the first matching .get() handler if no .head() handler precedes it.
 express()
     .use(authHandler)
-    .get(CACHE_PATH, getOrHeadHandler)
-    .head(CACHE_PATH, getOrHeadHandler)
+    .head(CACHE_PATH, headHandler)
+    .get(CACHE_PATH, getHandler)
     .put(CACHE_PATH, putHandler)
     .use(errorHandler)
     .listen(argv.port, argv.host, onListen);
@@ -70,25 +72,43 @@ function authHandler(req: express.Request, res: express.Response, next: express.
     next();
 }
 
-async function getOrHeadHandler(req: express.Request<{ hash: string }>, res: express.Response) {
-    const { hash } = req.params;
-    const storage = await getStorage();
-    const file = storage.bucket(argv.bucket).file(argv.prefix ? `${argv.prefix}${hash}` : hash);
+async function getHandler(req: express.Request<{ hash: string }>, res: express.Response) {
+    const file = await getFile(req.params.hash);
+
+    // Use .pipe(res) + finished(stream) instead of pipeline(stream, res) because pipeline()
+    // immediately calls res.destroy() when the source stream errors (such as a GCS 404),
+    // closing the socket before we can send a 404 HTTP response.
+    const stream = file.createReadStream();
+    res.on('close', () => stream.destroy());
+    stream.pipe(res);
+
+    try {
+        await finished(stream);
+        console.log(`[${new Date().toISOString()}] GET ${req.path} - 200 OK`);
+    } catch (e) {
+        // Ensure the upstream GCS stream is cleaned up if an error occurs before the stream closed.
+        stream.destroy();
+        if (!res.headersSent && hasNumericCode(e) && e.code === 404) {
+            res.sendStatus(404);
+            console.log(`[${new Date().toISOString()}] GET ${req.path} - 404 Not Found`);
+            return;
+        }
+        throw e;
+    }
+}
+
+async function headHandler(req: express.Request<{ hash: string }>, res: express.Response) {
+    const file = await getFile(req.params.hash);
 
     const [exists] = await file.exists();
     if (!exists) {
         res.sendStatus(404);
-        console.log(`[${new Date().toISOString()}] ${req.method} ${req.path} - 404 Not Found`);
+        console.log(`[${new Date().toISOString()}] HEAD ${req.path} - 404 Not Found`);
         return;
     }
 
-    if (req.method === 'HEAD') {
-        res.sendStatus(200);
-    } else {
-        await pipeline(file.createReadStream(), res);
-    }
-
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.path} - 200 OK`);
+    res.sendStatus(200);
+    console.log(`[${new Date().toISOString()}] HEAD ${req.path} - 200 OK`);
 }
 
 async function putHandler(req: express.Request<{ hash: string }>, res: express.Response) {
@@ -98,9 +118,7 @@ async function putHandler(req: express.Request<{ hash: string }>, res: express.R
         return;
     }
 
-    const { hash } = req.params;
-    const storage = await getStorage();
-    const file = storage.bucket(argv.bucket).file(argv.prefix ? `${argv.prefix}${hash}` : hash);
+    const file = await getFile(req.params.hash);
 
     console.log(`[${new Date().toISOString()}] PUT ${req.path} - Uploading as application/gzip...`);
 
@@ -138,6 +156,10 @@ async function errorHandler(err: unknown, req: express.Request, res: express.Res
         res.sendStatus(500);
         console.error(`[${new Date().toISOString()}] ${req.method} ${req.path} - Error (500): ${message}`);
     } else {
+        // Unlike pipeline(stream, res), stream.pipe(res) does not automatically destroy res when
+        // the source stream errors after headers have already been sent. Explicitly destroy res
+        // so the client does not hang waiting for the rest of an aborted response stream.
+        res.destroy();
         console.warn(`[${new Date().toISOString()}] ${req.method} ${req.path} - Request aborted: ${message}`);
     }
 }
@@ -153,6 +175,11 @@ function onListen(err?: Error) {
     if (argv.prefix) console.log(`Using prefix: ${argv.prefix}`);
     if (argv.readOnly) console.log('Mode: READ-ONLY');
     console.log(`Authentication: ${argv.token ? 'Enabled' : 'Disabled (running on local interface recommended)'}`);
+}
+
+async function getFile(hash: string) {
+    const storage = await getStorage();
+    return storage.bucket(argv.bucket).file(argv.prefix ? `${argv.prefix}${hash}` : hash);
 }
 
 function hasNumericCode(e: unknown): e is { code: number } {
