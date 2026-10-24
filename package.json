@@ -7,7 +7,7 @@
         "nx-remotecache-gcs": "adapter.js"
     },
     "scripts": {
-        "test": "echo \"Error: no test specified\" && exit 1",
+        "test": "node --test test/*.test.mjs",
         "prepare": "prettier -w . && tsc"
     },
     "repository": {
