@@ -31,6 +31,12 @@ const argv = yargs(hideBin(process.argv))
             describe: 'Maximum number of concurrent GCS operations',
         },
     })
+    .check((args) => {
+        if (!Number.isSafeInteger(args.concurrency) || args.concurrency < 1) {
+            throw new Error('--concurrency must be a positive safe integer');
+        }
+        return true;
+    })
     .help()
     .parseSync();
 
